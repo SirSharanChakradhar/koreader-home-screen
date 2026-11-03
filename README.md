@@ -1,6 +1,6 @@
 # KOReader Home Screen
 
-A launcher-style home screen for KOReader on e-readers. It appears when KOReader starts and every time you close a book, on top of the normal file browser.
+A launcher-style home screen for KOReader on e-readers. It replaces the file browser as KOReader's home: it appears when KOReader starts, every time you close a book, and when you tap the home icon in the file browser.
 
 ## What's on it
 
@@ -9,7 +9,9 @@ A launcher-style home screen for KOReader on e-readers. It appears when KOReader
 - **Panchang:** today's tithi, nakshatra and Rahu Kalam, computed on the device (Telugu or English)
 - **Now playing:** works with [koreader-navidrome-player](https://github.com/SirSharanChakradhar/koreader-navidrome-player). It shows what the device is playing, with previous / play-pause / next, or what you're playing on another Navidrome client. It's hidden if that plugin isn't installed.
 - **Continue reading:** your last book with its cover and progress, plus a row of recent books
-- **App tiles:** Library, Music, Kavita/OPDS, History, Favorites, Frontlight, Night mode, Wi-Fi, Sleep, and exit to the device's own software
+- **Dock:** Library, Music, Kavita, Settings and Apps (configurable with the `dock` setting)
+- **Apps page:** swipe left (or tap Apps) for every KOReader feature as an app, grouped into Reading (Library, Search, History, Collections, Favorites, Statistics, Today, Vocabulary, Dictionary, Wikipedia), Online (OPDS/Kavita, Calibre, Cloud, News, Wallabag, Progress sync, Music), Tools (Text editor, Terminal, Read timer, Battery, System, Screenshot, Network, SSH) and Device (Light, Night, Wi-Fi, Settings, Home settings, Sleep, Restart, exit). Plugins that only have a menu open it as a full-screen list. Apps for plugins you don't have are hidden. Swipe right to go back.
+- **Reading today:** time and pages read today, from KOReader's reading statistics
 
 ## Install
 

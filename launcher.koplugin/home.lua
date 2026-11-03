@@ -21,6 +21,7 @@ local InputContainer = require("ui/widget/container/inputcontainer")
 local LuaSettings = require("luasettings")
 local DataStorage = require("datastorage")
 local NetworkMgr = require("ui/network/manager")
+local Apps = require("apps")
 local Panchang = require("panchang")
 local ProgressWidget = require("ui/widget/progresswidget")
 local RenderImage = require("ui/renderimage")
@@ -64,6 +65,7 @@ function Home:init()
     self.W, self.H = Screen:getWidth(), Screen:getHeight()
     self.dimen = Geom:new{ x = 0, y = 0, w = self.W, h = self.H }
     self.cfg = Home.config()
+    self.page = self.page or self.cfg:readSetting("start_page") or 1
     self.Engine = optional("npengine")
     self.Api = optional("npapi")
     self.covers = {}        -- file -> blitbuffer
@@ -232,24 +234,52 @@ function Home:openMusic(library)
     self:send("ShowNowPlaying")
 end
 
-function Home:tiles()
-    return {
-        { I.folder, _("Library"), function()
-            self:close()
-            -- open the home folder without coming back here (unlike the home icon)
-            local fc = self.ui and self.ui.file_chooser
-            if fc and fc.goHome then pcall(fc.goHome, fc) end
-        end },
-        { I.music, _("Music"), function() self:openMusic(false) end },
-        { I.globe, _("Kavita"), function() self:send("ShowOPDSCatalog") end },
-        { I.history, _("History"), function() self:send("ShowHist") end },
-        { I.heart, _("Favorites"), function() self:send("ShowColl") end },
-        { I.bulb, _("Light"), function() self:send("ShowFlDialog") end },
-        { I.moon, _("Night"), function() self:send("ToggleNightMode"); UIManager:nextTick(function() self:refresh("full") end) end },
-        { I.wifi, _("Wi-Fi"), function() self:send("ToggleWifi") end },
-        { I.power, _("Sleep"), function() UIManager:suspend() end },
-        { I.signout, _("Kobo"), function() UIManager:broadcastEvent(Event:new("Exit")) end },
-    }
+function Home:openLibrary()
+    self:close()
+    -- open the home folder without coming back here (unlike the home icon)
+    local fc = self.ui and self.ui.file_chooser
+    if fc and fc.goHome then pcall(fc.goHome, fc) end
+end
+
+function Home:dockApps()
+    local ids = self.cfg:readSetting("dock") or Apps.DEFAULT_DOCK
+    local out = {}
+    for _, id in ipairs(ids) do
+        local a = Apps.byId(self.ui, id)
+        if a then table.insert(out, a) end
+    end
+    table.insert(out, { id = "apps", icon = Apps.ICON.th, label = _("Apps"), run = function(h) h:setPage(2) end })
+    return out
+end
+
+function Home:setPage(n)
+    self.page = n
+    self:refresh("full")
+end
+
+-- today's reading time and pages from the statistics plugin's database
+function Home:readingToday()
+    local now = os.time()
+    if self._today and now - self._today.at < 300 then return self._today end
+    local t = os.date("*t", now)
+    local midnight = os.time{ year = t.year, month = t.month, day = t.day, hour = 0, min = 0, sec = 0 }
+    local res = { at = now }
+    local ok = pcall(function()
+        local SQ3 = require("lua-ljsqlite3/init")
+        local db = DataStorage:getSettingsDir() .. "/statistics.sqlite3"
+        if lfs.attributes(db, "mode") ~= "file" then return end
+        local conn = SQ3.open(db)
+        local row = conn:exec(string.format(
+            "SELECT count(*), sum(duration) FROM page_stat_data WHERE start_time >= %d", midnight))
+        if row and row[1] then
+            res.pages = tonumber(row[1][1]) or 0
+            res.seconds = tonumber(row[2] and row[2][1]) or 0
+        end
+        conn:close()
+    end)
+    if not ok then logger.dbg("launcher: no reading stats") end
+    self._today = res
+    return res
 end
 
 ----------------------------------------------------------------- layout helpers
@@ -412,7 +442,7 @@ function Home:readingCard(inner, file)
         ProgressWidget:new{ width = text_w, height = Screen:scaleBySize(8),
             percentage = b.percent or 0, fillcolor = Blitbuffer.COLOR_BLACK },
         VerticalSpan:new{ width = Screen:scaleBySize(6) },
-        tw(pct and (pct .. "% " .. _("read")) or _("Not started"), 17, { color = GRAY }),
+        tw(self:progressLine(pct), 17, { color = GRAY, max_width = text_w }),
     }
     local content = HorizontalGroup:new{ align = "center",
         CenterContainer:new{ dimen = Geom:new{ w = cw, h = ch },
@@ -422,6 +452,17 @@ function Home:readingCard(inner, file)
     }
     local card = self:card(content, inner)
     return card, function(x, y) self:addHit(x, y, inner, card:getSize().h, function() self:openBook(file) end) end
+end
+
+function Home:progressLine(pct)
+    local line = pct and (pct .. "% " .. _("read")) or _("Not started")
+    local t = self:readingToday()
+    if t.seconds and t.seconds > 0 then
+        local m = math.floor(t.seconds / 60 + 0.5)
+        local dur = m >= 60 and string.format("%dh %02dm", math.floor(m / 60), m % 60) or (m .. " min")
+        line = line .. "   ·   " .. _("Today: ") .. dur .. ", " .. (t.pages or 0) .. " " .. _("pages")
+    end
+    return line
 end
 
 function Home:recentRow(inner, files, max_h)
@@ -463,16 +504,14 @@ function Home:recentRow(inner, files, max_h)
     end
 end
 
-function Home:tileGrid(inner)
-    local tiles = self:tiles()
-    local cols = 5
+-- a grid of app tiles; returns widget and register(x, y)
+function Home:grid(inner, apps, cols, th, icon_size, label_size)
     local gap = Screen:scaleBySize(12)
     local tw_ = math.floor((inner - gap * (cols - 1)) / cols)
-    local th = Screen:scaleBySize(88)
     local grid = VerticalGroup:new{ align = "left" }
     local regs = {}
     local row
-    for i, t in ipairs(tiles) do
+    for i, a in ipairs(apps) do
         local c = (i - 1) % cols
         if c == 0 then
             row = HorizontalGroup:new{}
@@ -482,18 +521,29 @@ function Home:tileGrid(inner)
         table.insert(row, FrameContainer:new{ width = tw_, height = th, padding = 0,
             bordersize = Screen:scaleBySize(1), radius = Screen:scaleBySize(14), color = Blitbuffer.COLOR_LIGHT_GRAY,
             CenterContainer:new{ dimen = Geom:new{ w = tw_ - 2, h = th - 2 },
-                VerticalGroup:new{ align = "center", tw(t[1], 30), VerticalSpan:new{ width = Screen:scaleBySize(4) }, tw(t[2], 16) } } })
+                VerticalGroup:new{ align = "center", tw(a.icon, icon_size or 30),
+                    VerticalSpan:new{ width = Screen:scaleBySize(4) },
+                    tw(a.label, label_size or 16, { max_width = tw_ - Screen:scaleBySize(8) }) } } })
         if c < cols - 1 then table.insert(row, HorizontalSpan:new{ width = gap }) end
         local r = math.floor((i - 1) / cols)
-        table.insert(regs, { dx = c * (tw_ + gap), dy = r * (th + gap), fn = t[3] })
+        table.insert(regs, { dx = c * (tw_ + gap), dy = r * (th + gap), a = a })
     end
     return grid, function(x, y)
-        for _, r in ipairs(regs) do self:addHit(x + r.dx, y + r.dy, tw_, th, r.fn) end
+        for _, r in ipairs(regs) do
+            self:addHit(x + r.dx, y + r.dy, tw_, th, function() r.a.run(self) end)
+        end
     end
+end
+
+function Home:pageDots()
+    local dots = (self.page == 2) and "\u{F10C}   \u{F111}" or "\u{F111}   \u{F10C}"
+    return CenterContainer:new{ dimen = Geom:new{ w = self.W - 2 * Screen:scaleBySize(30), h = Screen:scaleBySize(22) },
+        tw(dots, 12, { color = GRAY }) }
 end
 
 ----------------------------------------------------------------- build
 function Home:build()
+    if self.page == 2 then return self:buildApps() end
     local W, H = self.W, self.H
     local margin = Screen:scaleBySize(30)
     local inner = W - 2 * margin
@@ -509,7 +559,8 @@ function Home:build()
     add(self:musicCard(inner))
     local files = self:recentFiles(5)
     if files[1] then add(self:readingCard(inner, files[1])) end
-    local grid, grid_reg = self:tileGrid(inner)
+    local dock_apps = self:dockApps()
+    local grid, grid_reg = self:grid(inner, dock_apps, #dock_apps, Screen:scaleBySize(88))
     -- recent books only if they fit above the tiles
     local used = 0
     for _, s in ipairs(sections) do used = used + s[1]:getSize().h + gap end
@@ -517,7 +568,7 @@ function Home:build()
         local others = {}
         for i = 2, #files do table.insert(others, files[i]) end
         -- size the covers to whatever room is left above the tiles
-        local room = H - Screen:scaleBySize(10) - used - grid:getSize().h - Screen:scaleBySize(24) - gap
+        local room = H - Screen:scaleBySize(10) - used - grid:getSize().h - Screen:scaleBySize(30) - gap
         if room >= Screen:scaleBySize(120) then
             local row, row_reg = self:recentRow(inner, others, room)
             add(row, row_reg)
@@ -526,7 +577,7 @@ function Home:build()
     end
 
     -- never let the tiles fall off the bottom: shrink the gaps if needed
-    local total = Screen:scaleBySize(10) + grid:getSize().h + Screen:scaleBySize(24)
+    local total = Screen:scaleBySize(10) + grid:getSize().h + Screen:scaleBySize(30)
     for _, sct in ipairs(sections) do total = total + sct[1]:getSize().h end
     local free = H - total
     if free < gap * #sections then gap = math.max(0, math.floor(free / math.max(1, #sections))) end
@@ -543,13 +594,14 @@ function Home:build()
         y = y + gap
     end
     -- tiles pinned to the bottom
-    local grid_y = H - grid:getSize().h - Screen:scaleBySize(24)
+    local grid_y = H - grid:getSize().h - Screen:scaleBySize(30)
     if grid_y > y then
         table.insert(body, VerticalSpan:new{ width = grid_y - y })
         y = grid_y
     end
     table.insert(body, grid)
     grid_reg(margin, y)
+    table.insert(body, self:pageDots())
 
     self[1] = FrameContainer:new{
         width = W, height = H, padding = 0, margin = 0, bordersize = 0,
@@ -558,7 +610,57 @@ function Home:build()
     }
 end
 
+function Home:buildApps()
+    local W, H = self.W, self.H
+    local margin = Screen:scaleBySize(30)
+    local inner = W - 2 * margin
+    self.hit = {}
+    local body = VerticalGroup:new{ align = "left" }
+    local y = 0
+    local function put(w)
+        table.insert(body, w); y = y + w:getSize().h
+    end
+    put(VerticalSpan:new{ width = Screen:scaleBySize(10) })
+    put(self:statusBar(inner))
+    put(HorizontalGroup:new{ align = "center",
+        tw(_("Apps"), 34, { bold = true }),
+        HorizontalSpan:new{ width = Screen:scaleBySize(20) },
+        tw(os.date("%H:%M"), 22, { color = GRAY }),
+    })
+    put(VerticalSpan:new{ width = Screen:scaleBySize(6) })
+    local groups = Apps.available(self.ui)
+    -- fit every group on one page: shrink the tiles if needed
+    local rows = 0
+    for _, g in ipairs(groups) do rows = rows + math.ceil(#g.apps / 5) end
+    local head_h = Screen:scaleBySize(34)
+    local fixed = y + #groups * (head_h + Screen:scaleBySize(6)) + Screen:scaleBySize(40) + rows * Screen:scaleBySize(12)
+    local th = math.min(Screen:scaleBySize(84), math.floor((H - fixed) / math.max(1, rows)))
+    for _, g in ipairs(groups) do
+        local head = tw(g.title:upper(), 15, { color = GRAY })
+        put(HorizontalGroup:new{ align = "center", head,
+            VerticalSpan:new{ width = head_h } })
+        local grid, reg = self:grid(inner, g.apps, 5, th, 26, 15)
+        reg(margin, y)
+        put(grid)
+        put(VerticalSpan:new{ width = Screen:scaleBySize(6) })
+    end
+    local dots = self:pageDots()
+    local spare = H - y - dots:getSize().h - Screen:scaleBySize(8)
+    if spare > 0 then put(VerticalSpan:new{ width = spare }) end
+    put(dots)
+    self[1] = FrameContainer:new{
+        width = W, height = H, padding = 0, margin = 0, bordersize = 0,
+        background = Blitbuffer.COLOR_WHITE,
+        HorizontalGroup:new{ align = "top", HorizontalSpan:new{ width = margin }, body },
+    }
+end
+
 function Home:onGesture(ev)
+    if ev.ges == "swipe" then
+        if ev.direction == "west" and self.page ~= 2 then self:setPage(2) return true end
+        if ev.direction == "east" and self.page == 2 then self:setPage(1) return true end
+        return true
+    end
     if ev.ges ~= "tap" then return InputContainer.onGesture(self, ev) end
     local x, y = ev.pos.x, ev.pos.y
     for _, h in ipairs(self.hit) do
