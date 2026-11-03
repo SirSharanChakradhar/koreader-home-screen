@@ -33,9 +33,23 @@ end
 function Launcher:init()
     self:onDispatcherRegisterActions()
     self.ui.menu:registerToMainMenu(self)
-    -- in the file browser (not in a book): show the home screen
-    if not self.ui.document and not Home.config():isFalse("as_home") then
-        UIManager:nextTick(function() self:onShowLauncher() end)
+    if not self.ui.document then
+        -- the file browser's home icon (and the "Home" action) bring the home screen back
+        local fm = self.ui
+        if not fm._launcher_orig_onHome then
+            fm._launcher_orig_onHome = fm.onHome
+            fm.onHome = function(fm_self, ...)
+                local r = fm_self._launcher_orig_onHome(fm_self, ...)
+                if G_reader_settings:readSetting("home_dir") then
+                    UIManager:nextTick(function() self:onShowLauncher() end)
+                end
+                return r
+            end
+        end
+        -- show the home screen at start and after closing a book
+        if not Home.config():isFalse("as_home") then
+            UIManager:nextTick(function() self:onShowLauncher() end)
+        end
     end
 end
 

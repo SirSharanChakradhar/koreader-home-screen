@@ -235,7 +235,9 @@ function Home:tiles()
     return {
         { I.folder, _("Library"), function()
             self:close()
-            if self.ui and self.ui.goHome then pcall(self.ui.goHome, self.ui) end
+            -- open the home folder without coming back here (unlike the home icon)
+            local fc = self.ui and self.ui.file_chooser
+            if fc and fc.goHome then pcall(fc.goHome, fc) end
         end },
         { I.music, _("Music"), function() self:openMusic(false) end },
         { I.globe, _("Kavita"), function() self:send("ShowOPDSCatalog") end },
