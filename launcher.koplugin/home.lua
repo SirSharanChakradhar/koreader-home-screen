@@ -225,8 +225,21 @@ function Home:recentFiles(n)
 end
 
 ----------------------------------------------------------------- actions
+-- run a KOReader action: call the handler of whichever module provides it
+-- (the file browser itself or one of its plugins), else broadcast the event
 function Home:send(ev)
-    if self.ui then self.ui:handleEvent(Event:new(ev)) end
+    local ui = self.ui
+    if not ui then return end
+    local h = "on" .. ev
+    if type(ui[h]) == "function" then return ui[h](ui) end
+    for _, m in ipairs(ui) do
+        if type(m) == "table" and type(m[h]) == "function" then return m[h](m) end
+    end
+    for k, m in pairs(ui) do
+        if type(k) == "string" and type(m) == "table" and type(m[h]) == "function" then return m[h](m) end
+    end
+    logger.dbg("launcher: no handler for", ev, "- broadcasting")
+    UIManager:broadcastEvent(Event:new(ev))
 end
 
 function Home:openBook(file)
