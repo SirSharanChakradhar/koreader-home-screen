@@ -448,7 +448,8 @@ end
 
 ----------------------------------------------------------------- notes (Memos)
 function Mini.notes(home)
-    local cfg = home.cfg
+    -- read the settings fresh: they may have changed since the home screen opened
+    local cfg = require("luasettings"):open(require("datastorage"):getSettingsDir() .. "/launcher.lua")
     local url, token = cfg:readSetting("memos_url"), cfg:readSetting("memos_token")
     if not url or not token then
         local MultiInputDialog = require("ui/widget/multiinputdialog")
