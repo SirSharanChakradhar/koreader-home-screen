@@ -81,6 +81,14 @@ function Home:init()
     self:build()
     UIManager:scheduleIn(1, self.tick)
     UIManager:scheduleIn(2, self.poll)
+    -- testing aid: open an app straight away (settings key start_app = "<app id>")
+    local start_app = self.cfg:readSetting("start_app")
+    if start_app then
+        UIManager:scheduleIn(2, function()
+            local a = Apps.byId(self.ui, start_app)
+            if a then a.run(self) end
+        end)
+    end
     -- fetch the weather after the first paint
     UIManager:scheduleIn(1, function()
         if Weather:get(self.cfg:readSetting("lat"), self.cfg:readSetting("lon")) then self:refresh("ui") end
@@ -536,14 +544,18 @@ function Home:grid(inner, apps, cols, th, icon_size, label_size)
 end
 
 function Home:pageDots()
-    local dots = (self.page == 2) and "\u{F10C}   \u{F111}" or "\u{F111}   \u{F10C}"
+    local parts = {}
+    for i = 1, self:pageCount() do
+        table.insert(parts, (i == (self.page or 1)) and "\u{F111}" or "\u{F10C}")
+    end
+    local dots = table.concat(parts, "   ")
     return CenterContainer:new{ dimen = Geom:new{ w = self.W - 2 * Screen:scaleBySize(30), h = Screen:scaleBySize(22) },
         tw(dots, 12, { color = GRAY }) }
 end
 
 ----------------------------------------------------------------- build
 function Home:build()
-    if self.page == 2 then return self:buildApps() end
+    if (self.page or 1) >= 2 then return self:buildApps() end
     local W, H = self.W, self.H
     local margin = Screen:scaleBySize(30)
     local inner = W - 2 * margin
@@ -610,11 +622,40 @@ function Home:build()
     }
 end
 
+-- split the app groups into pages that fit the screen
+function Home:appPages()
+    if self._app_pages then return self._app_pages end
+    local groups = Apps.available(self.ui)
+    local th = Screen:scaleBySize(80)
+    local gap = Screen:scaleBySize(12)
+    local head_h = Screen:scaleBySize(34) + Screen:scaleBySize(6)
+    local top = Screen:scaleBySize(10) + Screen:scaleBySize(36) + Screen:scaleBySize(60) + Screen:scaleBySize(6)
+    local avail = self.H - top - Screen:scaleBySize(40)
+    local pages, cur, used = {}, {}, 0
+    for _, g in ipairs(groups) do
+        local rows = math.ceil(#g.apps / 5)
+        local h = head_h + rows * th + (rows - 1) * gap + Screen:scaleBySize(6)
+        if used + h > avail and #cur > 0 then
+            table.insert(pages, cur); cur, used = {}, 0
+        end
+        table.insert(cur, g); used = used + h
+    end
+    if #cur > 0 then table.insert(pages, cur) end
+    self._app_pages, self._tile_h = pages, th
+    return pages
+end
+
+function Home:pageCount()
+    return 1 + #self:appPages()
+end
+
 function Home:buildApps()
     local W, H = self.W, self.H
     local margin = Screen:scaleBySize(30)
     local inner = W - 2 * margin
     self.hit = {}
+    local pages = self:appPages()
+    local groups = pages[self.page - 1] or pages[1] or {}
     local body = VerticalGroup:new{ align = "left" }
     local y = 0
     local function put(w)
@@ -622,24 +663,20 @@ function Home:buildApps()
     end
     put(VerticalSpan:new{ width = Screen:scaleBySize(10) })
     put(self:statusBar(inner))
-    put(HorizontalGroup:new{ align = "center",
-        tw(_("Apps"), 34, { bold = true }),
-        HorizontalSpan:new{ width = Screen:scaleBySize(20) },
-        tw(os.date("%H:%M"), 22, { color = GRAY }),
-    })
+    local title = _("Apps")
+    if #pages > 1 then title = title .. "  " .. (self.page - 1) .. "/" .. #pages end
+    put(CenterContainer:new{ dimen = Geom:new{ w = inner, h = Screen:scaleBySize(60) },
+        HorizontalGroup:new{ align = "center", tw(title, 32, { bold = true }),
+            HorizontalSpan:new{ width = inner - tw(title, 32, { bold = true }):getSize().w - tw(os.date("%H:%M"), 22):getSize().w },
+            tw(os.date("%H:%M"), 22, { color = GRAY }) } })
     put(VerticalSpan:new{ width = Screen:scaleBySize(6) })
-    local groups = Apps.available(self.ui)
-    -- fit every group on one page: shrink the tiles if needed
-    local rows = 0
-    for _, g in ipairs(groups) do rows = rows + math.ceil(#g.apps / 5) end
     local head_h = Screen:scaleBySize(34)
-    local fixed = y + #groups * (head_h + Screen:scaleBySize(6)) + Screen:scaleBySize(40) + rows * Screen:scaleBySize(12)
-    local th = math.min(Screen:scaleBySize(84), math.floor((H - fixed) / math.max(1, rows)))
     for _, g in ipairs(groups) do
-        local head = tw(g.title:upper(), 15, { color = GRAY })
-        put(HorizontalGroup:new{ align = "center", head,
-            VerticalSpan:new{ width = head_h } })
-        local grid, reg = self:grid(inner, g.apps, 5, th, 26, 15)
+        put(CenterContainer:new{ dimen = Geom:new{ w = inner, h = head_h },
+            HorizontalGroup:new{ tw(g.title:upper(), 15, { color = GRAY }),
+                HorizontalSpan:new{ width = inner - tw(g.title:upper(), 15):getSize().w } } })
+        put(VerticalSpan:new{ width = Screen:scaleBySize(6) })
+        local grid, reg = self:grid(inner, g.apps, 5, self._tile_h, 26, 15)
         reg(margin, y)
         put(grid)
         put(VerticalSpan:new{ width = Screen:scaleBySize(6) })
@@ -657,8 +694,9 @@ end
 
 function Home:onGesture(ev)
     if ev.ges == "swipe" then
-        if ev.direction == "west" and self.page ~= 2 then self:setPage(2) return true end
-        if ev.direction == "east" and self.page == 2 then self:setPage(1) return true end
+        local p = self.page or 1
+        if ev.direction == "west" and p < self:pageCount() then self:setPage(p + 1) return true end
+        if ev.direction == "east" and p > 1 then self:setPage(p - 1) return true end
         return true
     end
     if ev.ges ~= "tap" then return InputContainer.onGesture(self, ev) end

@@ -12,6 +12,9 @@ local UIManager = require("ui/uimanager")
 local _ = require("gettext")
 
 local Apps = {}
+local function mini(name)
+    return function(home) require("miniapps")[name](home) end
+end
 
 local function ev(name)
     return function(home) home:send(name) end
@@ -110,6 +113,15 @@ local I = {
 Apps.ICON = I
 
 Apps.groups = {
+    { title = _("Everyday"), apps = {
+        { id = "calendar", icon = "\u{F073}", label = _("Calendar"), run = mini("calendar") },
+        { id = "panchang", icon = "\u{F186}", label = _("Panchang"), run = mini("panchang") },
+        { id = "weather", icon = "\u{F185}", label = _("Weather"), run = mini("weather") },
+        { id = "worldclock", icon = "\u{F0AC}", label = _("World clock"), run = mini("worldclock") },
+        { id = "calculator", icon = "\u{F1EC}", label = _("Calculator"), run = mini("calculator") },
+        { id = "stopwatch", icon = "\u{F017}", label = _("Stopwatch"), run = mini("stopwatch") },
+        { id = "notes", icon = "\u{F15C}", label = _("Notes"), run = mini("notes") },
+    } },
     { title = _("Reading"), apps = {
         { id = "library", icon = I.folder, label = _("Library"), run = function(h) h:openLibrary() end },
         { id = "search", icon = I.search, label = _("Search"), run = ev("ShowFileSearch") },
@@ -143,6 +155,16 @@ Apps.groups = {
         end },
         { id = "network", icon = I.sitemap, label = _("Network"), run = ev("ShowNetworkInfo") },
         { id = "ssh", icon = I.key, label = _("SSH"), run = pluginMenu("SSH", _("SSH server")), needs = "SSH" },
+        { id = "calibre_wireless", icon = "\u{F0EC}", label = _("Calibre Wi-Fi"), run = ev("StartWirelessConnection"), needs = "calibre" },
+        { id = "profiles", icon = "\u{F0AE}", label = _("Profiles"), run = pluginMenu("profiles", _("Profiles")), needs = "profiles" },
+        { id = "exporter", icon = "\u{F093}", label = _("Export notes"), run = pluginMenu("exporter", _("Export highlights")), needs = "exporter" },
+        { id = "bookshortcuts", icon = "\u{F02E}", label = _("Shortcuts"), run = pluginMenu("bookshortcuts", _("Book shortcuts")), needs = "bookshortcuts" },
+        { id = "gestures", icon = "\u{F25A}", label = _("Gestures"), run = pluginMenu("gestures", _("Gestures")), needs = "gestures" },
+        { id = "qrclipboard", icon = "\u{F029}", label = _("QR code"), run = pluginMenu("qrclipboard", _("QR clipboard")), needs = "qrclipboard" },
+        { id = "ephemeris", icon = "\u{F185}", label = _("Sun times"), run = ev("ShowEphemeris"), needs = "autowarmth" },
+        { id = "autowarmth", icon = "\u{F06D}", label = _("Warmth"), run = pluginMenu("autowarmth", _("Auto warmth")), needs = "autowarmth" },
+        { id = "autodim", icon = "\u{F042}", label = _("Auto dim"), run = pluginMenu("autodim", _("Auto dim")), needs = "autodim" },
+        { id = "httpinspector", icon = "\u{F0E4}", label = _("HTTP"), run = pluginMenu("httpinspector", _("HTTP inspector")), needs = "httpinspector" },
     } },
     { title = _("Device"), apps = {
         { id = "light", icon = I.bulb, label = _("Light"), run = ev("ShowFlDialog") },

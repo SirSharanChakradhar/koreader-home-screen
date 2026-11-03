@@ -98,4 +98,88 @@ function Panchang.rahuKalam(sunrise, sunset)
     return start, start + eighth
 end
 
+-- nakshatra index 0-26 at Unix time t
+function Panchang.nakshatraIndex(t)
+    local T = centuries(t)
+    return math.min(26, math.floor(norm(moon(T) - ayanamsa(T)) / (360 / 27)))
+end
+
+-- first time after `t` when f(t) changes (searches up to `max_h` hours)
+local function nextChange(f, t, max_h)
+    local v = f(t)
+    local step = 600
+    local a = t
+    local b = t + step
+    local limit = t + (max_h or 36) * 3600
+    while f(b) == v do
+        a = b; b = b + step
+        if b > limit then return nil end
+    end
+    for _ = 1, 20 do -- bisect to the second
+        local m = math.floor((a + b) / 2)
+        if f(m) == v then a = m else b = m end
+        if b - a <= 1 then break end
+    end
+    return b
+end
+
+function Panchang.tithiEnds(t) return nextChange(Panchang.tithiIndex, t, 36) end
+function Panchang.nakshatraEnds(t) return nextChange(Panchang.nakshatraIndex, t, 36) end
+
+-- tithi name for an index (0-29)
+function Panchang.tithiName(i, lang)
+    lang = TITHI[lang] and lang or "en"
+    if i == 14 then return FULL[lang] end
+    if i == 29 then return NEW[lang] end
+    return PAKSHA[lang][i < 15 and 1 or 2] .. " " .. TITHI[lang][(i % 15) + 1]
+end
+
+-- short tithi name for calendar cells
+function Panchang.tithiShort(i, lang)
+    lang = TITHI[lang] and lang or "en"
+    if i == 14 then return FULL[lang] end
+    if i == 29 then return NEW[lang] end
+    return TITHI[lang][(i % 15) + 1]
+end
+
+function Panchang.nakshatraName(i, lang)
+    lang = NAKSHATRA[lang] and lang or "en"
+    return NAKSHATRA[lang][i + 1]
+end
+
+local YAMA_PART = { 5, 4, 3, 2, 1, 7, 6 }   -- Sunday..Saturday
+local GULIKA_PART = { 7, 6, 5, 4, 3, 2, 1 }
+local function eighthOfDay(parts, sunrise, sunset)
+    if not sunrise or not sunset or sunset <= sunrise then return nil end
+    local part = parts[tonumber(os.date("%w", sunrise)) + 1]
+    local eighth = (sunset - sunrise) / 8
+    local start = sunrise + eighth * (part - 1)
+    return start, start + eighth
+end
+function Panchang.yamaganda(sunrise, sunset) return eighthOfDay(YAMA_PART, sunrise, sunset) end
+function Panchang.gulika(sunrise, sunset) return eighthOfDay(GULIKA_PART, sunrise, sunset) end
+
+-- Brahma muhurta: the 2nd-last muhurta (48 min) before sunrise
+function Panchang.brahmaMuhurta(sunrise)
+    if not sunrise then return nil end
+    return sunrise - 96 * 60, sunrise - 48 * 60
+end
+
+-- Abhijit: the 8th of 15 daytime muhurtas, around local noon
+function Panchang.abhijit(sunrise, sunset)
+    if not sunrise or not sunset then return nil end
+    local m = (sunset - sunrise) / 15
+    return sunrise + 7 * m, sunrise + 8 * m
+end
+
+Panchang.LABEL.te.yama, Panchang.LABEL.en.yama = "యమగండం", "Yamaganda"
+Panchang.LABEL.te.gulika, Panchang.LABEL.en.gulika = "గుళిక", "Gulika"
+Panchang.LABEL.te.brahma, Panchang.LABEL.en.brahma = "బ్రహ్మ ముహూర్తం", "Brahma muhurta"
+Panchang.LABEL.te.abhijit, Panchang.LABEL.en.abhijit = "అభిజిత్", "Abhijit"
+Panchang.LABEL.te.tithi, Panchang.LABEL.en.tithi = "తిథి", "Tithi"
+Panchang.LABEL.te.nakshatra, Panchang.LABEL.en.nakshatra = "నక్షత్రం", "Nakshatra"
+Panchang.LABEL.te["until"], Panchang.LABEL.en["until"] = "వరకు", "until"
+Panchang.LABEL.te.sunrise, Panchang.LABEL.en.sunrise = "సూర్యోదయం", "Sunrise"
+Panchang.LABEL.te.sunset, Panchang.LABEL.en.sunset = "సూర్యాస్తమయం", "Sunset"
+
 return Panchang

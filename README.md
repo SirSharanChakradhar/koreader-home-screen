@@ -10,8 +10,17 @@ A launcher-style home screen for KOReader on e-readers. It replaces the file bro
 - **Now playing:** works with [koreader-navidrome-player](https://github.com/SirSharanChakradhar/koreader-navidrome-player). It shows what the device is playing, with previous / play-pause / next, or what you're playing on another Navidrome client. It's hidden if that plugin isn't installed.
 - **Continue reading:** your last book with its cover and progress, plus a row of recent books
 - **Dock:** Library, Music, Kavita, Settings and Apps (configurable with the `dock` setting)
-- **Apps page:** swipe left (or tap Apps) for every KOReader feature as an app, grouped into Reading (Library, Search, History, Collections, Favorites, Statistics, Today, Vocabulary, Dictionary, Wikipedia), Online (OPDS/Kavita, Calibre, Cloud, News, Wallabag, Progress sync, Music), Tools (Text editor, Terminal, Read timer, Battery, System, Screenshot, Network, SSH) and Device (Light, Night, Wi-Fi, Settings, Home settings, Sleep, Restart, exit). Plugins that only have a menu open it as a full-screen list. Apps for plugins you don't have are hidden. Swipe right to go back.
+- **Apps pages:** swipe left (or tap Apps) for every KOReader feature as an app, grouped into Everyday (the mini apps below), Reading (Library, Search, History, Collections, Favorites, Statistics, Today, Vocabulary, Dictionary, Wikipedia), Online (OPDS/Kavita, Calibre, Cloud, News, Wallabag, Progress sync, Music), Tools (Text editor, Terminal, Read timer, Battery, System, Screenshot, Network, SSH, Calibre wireless, Profiles, Export highlights, Book shortcuts, Gestures, QR code, Sun times, Warmth, Auto dim, HTTP inspector) and Device (Light, Night, Wi-Fi, Settings, Home settings, Sleep, Restart, exit). Plugins that only have a menu open it as a full-screen list. Apps for plugins you don't have are hidden. Swipe right to go back.
 - **Reading today:** time and pages read today, from KOReader's reading statistics
+- **Built-in mini apps** (in the Everyday group):
+  - **Calendar:** month view with each day's tithi and full/new moon marks; swipe for other months
+  - **Panchang:** tithi and nakshatra with end times, sunrise/sunset, Rahu Kalam, Yamaganda, Gulika, Brahma muhurta, Abhijit
+  - **Weather:** current conditions and a 7-day forecast (rain chance, sunrise/sunset, UV)
+  - **World clock:** configurable with the `world_zones` setting
+  - **Calculator**
+  - **Stopwatch & timer** (keeps the device awake while running)
+  - **Notes:** read and add notes on a [Memos](https://usememos.com) server (asks for the address and an access token the first time)
+- The Apps section spans several pages; swipe left/right
 
 ## Install
 
