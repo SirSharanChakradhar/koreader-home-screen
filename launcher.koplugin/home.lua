@@ -205,7 +205,8 @@ function Home:recentFiles(n)
     if not ok then return out end
     pcall(RH.reload, RH)
     for _, item in ipairs(RH.hist or {}) do
-        if item.file and not item.dim and lfs.attributes(item.file, "mode") == "file" then
+        if item.file and not item.dim and not item.file:find("/koreader/help/", 1, true)
+            and lfs.attributes(item.file, "mode") == "file" then
             table.insert(out, item.file)
             if #out >= n then break end
         end
@@ -287,13 +288,13 @@ end
 function Home:header(inner)
     local cfg = self.cfg
     local left = VerticalGroup:new{ align = "left",
-        tw(os.date("%H:%M"), 100, { font = "ffont", bold = true }),
+        tw(os.date("%H:%M"), 88, { font = "ffont", bold = true }),
         tw(os.date("%A, %d %B"), 26),
     }
     local right = VerticalGroup:new{ align = "right" }
     local w = Weather.data
     if w and w.temp then
-        table.insert(right, tw(w.icon .. "  " .. string.format("%d°", math.floor(w.temp + 0.5)), 52, { bold = true }))
+        table.insert(right, tw(w.icon .. "  " .. string.format("%d°", math.floor(w.temp + 0.5)), 46, { bold = true }))
         local hl = (w.high and w.low) and string.format("H %d°  ·  L %d°", math.floor(w.high + 0.5), math.floor(w.low + 0.5)) or ""
         table.insert(right, tw(hl, 20))
         table.insert(right, tw((w.text or "") .. ((cfg:readSetting("place") and ("  ·  " .. cfg:readSetting("place"))) or ""), 18, { color = GRAY }))
@@ -332,7 +333,7 @@ end
 function Home:musicCard(inner)
     local track, mode = self:musicTrack()
     local card_inner = inner - 2 * (Screen:scaleBySize(15))
-    local cs = Screen:scaleBySize(150)
+    local cs = Screen:scaleBySize(118)
     local regs = {}
     local content = VerticalGroup:new{ align = "left" }
     local info_h = cs
@@ -353,8 +354,8 @@ function Home:musicCard(inner)
         VerticalGroup:new{ align = "left",
             tw(label, 15, { color = GRAY, max_width = text_w }),
             VerticalSpan:new{ width = Screen:scaleBySize(6) },
-            tb(title, 26, text_w, { bold = true, height = Screen:scaleBySize(70) }),
-            tb(sub, 20, text_w, { color = GRAY, height = Screen:scaleBySize(30) }),
+            tb(title, 24, text_w, { bold = true, height = Screen:scaleBySize(36) }),
+            tb(sub, 19, text_w, { color = GRAY, height = Screen:scaleBySize(28) }),
         },
     }
     table.insert(content, info)
@@ -362,11 +363,11 @@ function Home:musicCard(inner)
     if mode == "local" then
         local E = self.Engine
         local dur = tonumber(track.duration) or 0
-        table.insert(content, VerticalSpan:new{ width = Screen:scaleBySize(12) })
-        table.insert(content, ProgressWidget:new{ width = card_inner, height = Screen:scaleBySize(8),
+        table.insert(content, VerticalSpan:new{ width = Screen:scaleBySize(10) })
+        table.insert(content, ProgressWidget:new{ width = card_inner, height = Screen:scaleBySize(6),
             percentage = dur > 0 and math.min(1, E:position() / dur) or 0, fillcolor = Blitbuffer.COLOR_BLACK })
-        table.insert(content, VerticalSpan:new{ width = Screen:scaleBySize(12) })
-        local ch = Screen:scaleBySize(74)
+        table.insert(content, VerticalSpan:new{ width = Screen:scaleBySize(10) })
+        local ch = Screen:scaleBySize(56)
         local gap = Screen:scaleBySize(10)
         local cw = math.floor((card_inner - 2 * gap) / 3)
         local row = HorizontalGroup:new{}
@@ -378,12 +379,12 @@ function Home:musicCard(inner)
         for i, a in ipairs(acts) do
             table.insert(row, FrameContainer:new{ width = cw, height = ch, padding = 0, bordersize = Screen:scaleBySize(1),
                 radius = Screen:scaleBySize(10), color = Blitbuffer.COLOR_LIGHT_GRAY,
-                CenterContainer:new{ dimen = Geom:new{ w = cw - 2, h = ch - 2 }, tw(a[1], 32) } })
+                CenterContainer:new{ dimen = Geom:new{ w = cw - 2, h = ch - 2 }, tw(a[1], 26) } })
             if i < 3 then table.insert(row, HorizontalSpan:new{ width = gap }) end
         end
         table.insert(content, row)
         controls_h = ch
-        local before = info_h + Screen:scaleBySize(32) -- info + spacing + progress + spacing
+        local before = info:getSize().h + Screen:scaleBySize(10) + Screen:scaleBySize(6) + Screen:scaleBySize(10)
         for i, a in ipairs(acts) do
             table.insert(regs, { dx = (i - 1) * (cw + gap), dy = before, w = cw, h = ch, fn = a[2] })
         end
@@ -397,7 +398,7 @@ function Home:musicCard(inner)
 end
 
 function Home:readingCard(inner, file)
-    local cw, ch = Screen:scaleBySize(130), Screen:scaleBySize(185)
+    local cw, ch = Screen:scaleBySize(100), Screen:scaleBySize(142)
     local b = self:bookInfo(file, cw, ch)
     local card_inner = inner - 2 * Screen:scaleBySize(15)
     local text_w = card_inner - cw - Screen:scaleBySize(18)
@@ -405,9 +406,9 @@ function Home:readingCard(inner, file)
     local right = VerticalGroup:new{ align = "left",
         tw(_("CONTINUE READING"), 15, { color = GRAY }),
         VerticalSpan:new{ width = Screen:scaleBySize(6) },
-        tb(b.title, 26, text_w, { bold = true, height = Screen:scaleBySize(70) }),
-        tb(b.authors or "", 20, text_w, { color = GRAY, height = Screen:scaleBySize(30) }),
-        VerticalSpan:new{ width = Screen:scaleBySize(14) },
+        tb(b.title, 24, text_w, { bold = true, height = Screen:scaleBySize(36) }),
+        tb(b.authors or "", 19, text_w, { color = GRAY, height = Screen:scaleBySize(28) }),
+        VerticalSpan:new{ width = Screen:scaleBySize(10) },
         ProgressWidget:new{ width = text_w, height = Screen:scaleBySize(8),
             percentage = b.percent or 0, fillcolor = Blitbuffer.COLOR_BLACK },
         VerticalSpan:new{ width = Screen:scaleBySize(6) },
@@ -423,11 +424,16 @@ function Home:readingCard(inner, file)
     return card, function(x, y) self:addHit(x, y, inner, card:getSize().h, function() self:openBook(file) end) end
 end
 
-function Home:recentRow(inner, files)
+function Home:recentRow(inner, files, max_h)
     local n = 4
     local gap = Screen:scaleBySize(16)
+    local label_h = Screen:scaleBySize(30)
     local cw = math.floor((inner - gap * (n - 1)) / n)
     local ch = math.floor(cw * 1.4)
+    if max_h and ch > max_h - label_h then
+        ch = max_h - label_h
+        cw = math.floor(ch / 1.4)
+    end
     local row = HorizontalGroup:new{ align = "top" }
     local items = {}
     for i, f in ipairs(files) do
@@ -449,7 +455,7 @@ function Home:recentRow(inner, files)
         VerticalSpan:new{ width = Screen:scaleBySize(8) },
         row,
     }
-    local label_h = block[1]:getSize().h + Screen:scaleBySize(8)
+    label_h = block[1]:getSize().h + Screen:scaleBySize(8)
     return block, function(x, y)
         for i, f in ipairs(items) do
             self:addHit(x + (i - 1) * (cw + gap), y + label_h, cw, ch, function() self:openBook(f) end)
@@ -462,7 +468,7 @@ function Home:tileGrid(inner)
     local cols = 5
     local gap = Screen:scaleBySize(12)
     local tw_ = math.floor((inner - gap * (cols - 1)) / cols)
-    local th = Screen:scaleBySize(108)
+    local th = Screen:scaleBySize(88)
     local grid = VerticalGroup:new{ align = "left" }
     local regs = {}
     local row
@@ -476,7 +482,7 @@ function Home:tileGrid(inner)
         table.insert(row, FrameContainer:new{ width = tw_, height = th, padding = 0,
             bordersize = Screen:scaleBySize(1), radius = Screen:scaleBySize(14), color = Blitbuffer.COLOR_LIGHT_GRAY,
             CenterContainer:new{ dimen = Geom:new{ w = tw_ - 2, h = th - 2 },
-                VerticalGroup:new{ align = "center", tw(t[1], 34), VerticalSpan:new{ width = Screen:scaleBySize(6) }, tw(t[2], 17) } } })
+                VerticalGroup:new{ align = "center", tw(t[1], 30), VerticalSpan:new{ width = Screen:scaleBySize(4) }, tw(t[2], 16) } } })
         if c < cols - 1 then table.insert(row, HorizontalSpan:new{ width = gap }) end
         local r = math.floor((i - 1) / cols)
         table.insert(regs, { dx = c * (tw_ + gap), dy = r * (th + gap), fn = t[3] })
@@ -491,7 +497,7 @@ function Home:build()
     local W, H = self.W, self.H
     local margin = Screen:scaleBySize(30)
     local inner = W - 2 * margin
-    local gap = Screen:scaleBySize(22)
+    local gap = Screen:scaleBySize(14)
     self.hit = {}
 
     -- sections, each { widget, register(x, y) or nil }
@@ -510,12 +516,21 @@ function Home:build()
     if #files > 1 then
         local others = {}
         for i = 2, #files do table.insert(others, files[i]) end
-        local row, row_reg = self:recentRow(inner, others)
-        if used + row:getSize().h + gap + grid:getSize().h + Screen:scaleBySize(20) <= H then
+        -- size the covers to whatever room is left above the tiles
+        local room = H - Screen:scaleBySize(10) - used - grid:getSize().h - Screen:scaleBySize(24) - gap
+        if room >= Screen:scaleBySize(120) then
+            local row, row_reg = self:recentRow(inner, others, room)
             add(row, row_reg)
             used = used + row:getSize().h + gap
         end
     end
+
+    -- never let the tiles fall off the bottom: shrink the gaps if needed
+    local total = Screen:scaleBySize(10) + grid:getSize().h + Screen:scaleBySize(24)
+    for _, sct in ipairs(sections) do total = total + sct[1]:getSize().h end
+    local free = H - total
+    if free < gap * #sections then gap = math.max(0, math.floor(free / math.max(1, #sections))) end
+    logger.dbg("launcher: layout H", H, "content", total, "gap", gap)
 
     local body = VerticalGroup:new{ align = "left" }
     local y = Screen:scaleBySize(10)
